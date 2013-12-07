@@ -1,5 +1,6 @@
 <?php
 /**
+ * @file
  * Creates a new core for the Drupal instance.
  */
 
@@ -9,16 +10,46 @@
 function dev_solr_drush_command() {
   $items = array();
 
+  $common_option = array(
+    'options' => array(
+      'solr-multicore-home' => 'Path to multicore directory within Solr installation.',
+    ),
+  );
+
   $items['dev-solr-setup'] = array(
     'callback' => 'dev_solr_setup',
     'description' => 'Creates a new Solr core for the site',
     'bootstrap' => DRUSH_BOOTSTRAP_DRUPAL_FULL,
+  ) + $common_option;
+  $items['dev-solr-start'] = array(
+    'callback' => 'dev_solr_start',
+    'description' => 'Starts the multi-core Solr engine',
+    'bootstrap' => DRUSH_BOOTSTRAP_DRUSH,
+  ) + $common_option;
+  $items['dev-solr-restart'] = array(
+    'callback' => 'dev_solr_restart',
+    'description' => 'Restarts the multi-core Solr engine',
+    'bootstrap' => DRUSH_BOOTSTRAP_DRUSH,
+  ) + $common_option;
+  $items['dev-solr-configure'] = array(
+    'callback' => 'dev_solr_configure',
+    'description' => 'Configures the site to use the local multi-core Solr',
+    'bootstrap' => DRUSH_BOOTSTRAP_DRUPAL_FULL,
   );
+  $items['dev-solr-get-config'] = array(
+    'callback' => 'dev_solr_get_config',
+    'description' => 'Shows configuration for the given site',
+    'bootstrap' => DRUSH_BOOTSTRAP_DRUPAL_CONFIGURATION,
+  );
+
   return $items;
 }
 
+/**
+ * Returns the home of the multicore directory within the Solr installation.
+ */
 function dev_solr_get_multicore() {
-  return '/opt/apache-solr-3.6.2/dev/multicore';
+  return drush_get_option('solr-multicore-home', '/opt/apache-solr-3.6.2/dev/multicore');
 }
 
 /**
@@ -38,8 +69,8 @@ function dev_solr_setup() {
   $solr_conf = $core_path . '/solr.xml';
 
   $doc = new DOMDocument();
-  $xmlDoc->preserveWhiteSpace = false;
-  $xmlDoc->formatOutput = true;
+  $doc->preserveWhiteSpace = FALSE;
+  $doc->formatOutput = TRUE;
   $doc->load($solr_conf);
   $db = _drush_sql_get_db_spec();
   $core_name = str_replace('-', '_', drupal_clean_css_identifier($db['database']));
@@ -66,6 +97,16 @@ function dev_solr_setup() {
   dev_solr_copy_config($drupal_solr_conf_path, $core_path . '/' . $core_name . '/conf');
 }
 
+/**
+ * Command to start the multi-core solr.
+ */
+function dev_solr_start() {
+  popen('cd ' . dev_solr_get_multicore() . '/../ && nohup java -Dsolr.solr.home=multicore -jar start.jar &', 'r');
+}
+
+/**
+ * Copies directory recursively.
+ */
 function dev_solr_copy_config($source, $dest) {
   $source = realpath($source);
   $dest = realpath($dest);
@@ -78,4 +119,3 @@ function dev_solr_copy_config($source, $dest) {
     }
   }
 }
-
