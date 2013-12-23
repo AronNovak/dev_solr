@@ -4,6 +4,8 @@
  * Creates a new core for the Drupal instance.
  */
 
+define('DEV_SOLR_BASE', 'http://localhost:8983/solr/');
+
 /**
  * Implements hook_drush_command().
  */
@@ -40,7 +42,7 @@ function dev_solr_drush_command() {
   $items['dev-solr-get-config'] = array(
     'callback' => 'dev_solr_get_config',
     'description' => 'Shows configuration for the given site',
-    'bootstrap' => DRUSH_BOOTSTRAP_DRUPAL_CONFIGURATION,
+    'bootstrap' => DRUSH_BOOTSTRAP_DRUPAL_FULL,
   );
 
   return $items;
@@ -79,8 +81,7 @@ function dev_solr_setup() {
   $doc->preserveWhiteSpace = FALSE;
   $doc->formatOutput = TRUE;
   $doc->load($solr_conf);
-  $db = _drush_sql_get_db_spec();
-  $core_name = str_replace('-', '_', drupal_clean_css_identifier($db['database']));
+  $core_name = dev_solr_get_core_name();
   $xpath = new DOMXpath($doc);
 
   // Do not recreate existing cores.
@@ -105,10 +106,46 @@ function dev_solr_setup() {
 }
 
 /**
- * Command to start the multi-core solr.
+ * Command to start the multi-core Solr engine.
  */
 function dev_solr_start() {
-  popen('cd ' . dev_solr_get_multicore() . '/../ && nohup java -Dsolr.solr.home=multicore -jar start.jar &', 'r');
+  popen('cd ' . dev_solr_get_multicore() . '/../ && nohup java -Dsolr.solr.home=multicore -jar start.jar &
+echo $! > ' . dev_solr_get_pidfile_path(), 'r');
+}
+
+/**
+ * Command to restart the multi-core Solr engine.
+ */
+function dev_solr_restart() {
+  dev_solr_stop();
+  dev_solr_start();
+}
+
+/**
+ * Command to stop the multi-core Solr engine.
+ */
+function dev_solr_stop() {
+  $pid = file_get_contents(dev_solr_get_pidfile_path());
+  if (!empty($pid)) {
+    popen('kill `pgrep -P ' . $pid . '`', 'r');
+  }
+  else {
+    drush_log('There\'s no running Solr engine', 'warning');
+    return;
+  }
+  // Waits for Solr to stop completely.
+  do {
+    usleep(200000);
+    $pids = array();
+    exec('pgrep -P ' . $pid, $pids);
+  } while (!empty($pids));
+}
+
+/**
+ * Shows the configuration for the given site.
+ */
+function dev_solr_get_config() {
+  drush_print(DEV_SOLR_BASE . dev_solr_get_core_name());
 }
 
 /**
@@ -125,4 +162,23 @@ function dev_solr_copy_config($source, $dest) {
       copy($item, $dest . DIRECTORY_SEPARATOR . $iterator->getSubPathName());
     }
   }
+}
+
+/**
+ * Returns a generated Solr core name for the current site.
+ */
+function dev_solr_get_core_name() {
+  $db = _drush_sql_get_db_spec();
+  return str_replace('-', '_', drupal_clean_css_identifier($db['database']));
+}
+
+/**
+ * Returns a suitable path for a file to store the process ID.
+ */
+function dev_solr_get_pidfile_path() {
+  $dir = $_SERVER['HOME'] . '/.drush_dev_solr';
+  if (!file_exists($dir)) {
+    mkdir($dir);
+  }
+  return $dir . '/pid';
 }
