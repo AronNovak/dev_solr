@@ -13,6 +13,7 @@ function dev_solr_drush_command() {
   $common_option = array(
     'options' => array(
       'solr-multicore-home' => 'Path to multicore directory within Solr installation.',
+      'solr-config' => 'Site-specific Solr config directory.',
     ),
   );
 
@@ -65,6 +66,12 @@ function dev_solr_setup() {
     $path = drupal_get_path('module', 'apachesolr');
     $drupal_solr_conf_path = realpath($path . '/solr-conf/solr-3.x');
   }
+
+  $solr_config_opt = drush_get_option('solr-config', FALSE);
+  if ($solr_config_opt !== FALSE) {
+    $drupal_solr_conf_path = $solr_config_opt;
+  }
+
   $core_path = dev_solr_get_multicore();
   $solr_conf = $core_path . '/solr.xml';
 
