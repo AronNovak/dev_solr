@@ -112,6 +112,41 @@ function dev_solr_setup() {
 }
 
 /**
+ * Command to override Solr configuration with the newly created core.
+ */
+function dev_solr_configure() {
+  if (module_exists('search_api_solr')) {
+    drush_log('Search API Solr is detected');
+    $servers = db_select('search_api_server', 's')
+      ->fields('s', array('id', 'options'))
+      ->execute();
+    if ($servers->rowCount() > 1) {
+      drush_log('There are multiple servers, the situation is more complex, configure it manually!', 'warning');
+      return;
+    }
+    $base = parse_url(DEV_SOLR_BASE);
+    foreach ($servers as $server) {
+      $options = unserialize($server->options);
+      $options['host'] = $base['host'];
+      $options['port'] = $base['port'];
+      $options['path'] = $base['path'] . dev_solr_get_core_name();
+
+      db_update('search_api_server')
+        ->fields(array(
+         'options' => serialize($options),
+       ))
+       ->condition('id', $server->id)
+       ->execute();
+
+    }
+  }
+  elseif (module_exists('apachesolr')) {
+    drush_log('Apachesolr is detected');
+    // @todo implement ApacheSolr module support.
+  }
+}
+
+/**
  * Command to start the multi-core Solr engine.
  */
 function dev_solr_start() {
