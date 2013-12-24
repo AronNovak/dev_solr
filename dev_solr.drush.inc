@@ -29,6 +29,12 @@ function dev_solr_drush_command() {
     'description' => 'Starts the multi-core Solr engine',
     'bootstrap' => DRUSH_BOOTSTRAP_DRUSH,
   ) + $common_option;
+  $items['dev-solr-stop'] = array(
+    'callback' => 'dev_solr_stop',
+    'description' => 'Stops the multi-core Solr engine',
+    'bootstrap' => DRUSH_BOOTSTRAP_DRUSH,
+  ) + $common_option;
+
   $items['dev-solr-restart'] = array(
     'callback' => 'dev_solr_restart',
     'description' => 'Restarts the multi-core Solr engine',
@@ -139,6 +145,7 @@ function dev_solr_stop() {
     $pids = array();
     exec('pgrep -P ' . $pid, $pids);
   } while (!empty($pids));
+  unlink(dev_solr_get_pidfile_path());
 }
 
 /**
